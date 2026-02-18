@@ -63,9 +63,7 @@ function splitIntoRanges(rolls) {
   if (!rolls || rolls.length === 0) return [];
 
   // Proper numeric sort
-  rolls.sort((a, b) =>
-    a.localeCompare(b, undefined, { numeric: true })
-  );
+  rolls.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
   const ranges = [];
   let start = rolls[0];
@@ -83,8 +81,7 @@ function splitIntoRanges(rolls) {
     const current = rolls[i];
 
     const samePrefix = getPrefix(current) === getPrefix(prev);
-    const consecutive =
-      getNumber(current) === getNumber(prev) + 1;
+    const consecutive = getNumber(current) === getNumber(prev) + 1;
 
     if (samePrefix && consecutive) {
       prev = current;
@@ -92,7 +89,7 @@ function splitIntoRanges(rolls) {
       ranges.push({
         from: start,
         to: prev,
-        count: getNumber(prev) - getNumber(start) + 1
+        count: getNumber(prev) - getNumber(start) + 1,
       });
 
       start = current;
@@ -104,7 +101,7 @@ function splitIntoRanges(rolls) {
   ranges.push({
     from: start,
     to: prev,
-    count: getNumber(prev) - getNumber(start) + 1
+    count: getNumber(prev) - getNumber(start) + 1,
   });
 
   return ranges;
@@ -133,8 +130,8 @@ function generateHallHTML(allocation, date) {
             row: rIdx + 1,
             seatLabel: String.fromCharCode(65 + rIdx) + (bIdx + 1),
           });
-        })
-      )
+        }),
+      ),
     );
 
     /* Group by Year */
@@ -146,7 +143,7 @@ function generateHallHTML(allocation, date) {
     });
 
     Object.values(yearMap).forEach((arr) =>
-      arr.sort((a, b) => a.name.localeCompare(b.name))
+      arr.sort((a, b) => a.name.localeCompare(b.name)),
     );
 
     /* Base HTML */
@@ -198,7 +195,10 @@ th {
     margin-right: 4mm;
   }
 
-   
+   .page-break {
+    page-break-before: always;
+    break-before: page;
+  }
 
 }
 
@@ -230,15 +230,16 @@ th {
 }
 
 .seat-box {
+  border-radius:5px;
   width: 80px;
-  height: 60px;
+  height: 50px;
   border: 2px solid black;
   margin-right: 8px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .empty-seat {
@@ -262,7 +263,6 @@ th {
 `;
 
     /* ================= SEATING LIST ================= */
-
 
     /* ================= GRID ================= */
 
@@ -307,7 +307,6 @@ th {
 </div>
 `;
 
-
     /* ================= ATTENDANCE ================= */
     html += `
 <div class="page-break"></div>
@@ -316,7 +315,6 @@ th {
 <h5>Exam Date: ${formatWithHalfDay(date)}</h5>
 `;
     for (const year of Object.keys(yearMap).sort((a, b) => a - b)) {
-
       html += `
 <h3>Year: ${year}</h3>
 
@@ -331,7 +329,6 @@ th {
 
       // 🔥 Strict Roll Number Sorting
       const sortedStudents = [...yearMap[year]].sort((a, b) => {
-
         const regex = /^([A-Z]+\d+)([A-Z])(\d+)$/;
 
         const matchA = a.roll.match(regex);
@@ -412,9 +409,7 @@ function compressRollNumbers(rolls) {
   if (!rolls || rolls.length === 0) return "";
 
   // Sort properly (numeric aware)
-  rolls.sort((a, b) =>
-    a.localeCompare(b, undefined, { numeric: true })
-  );
+  rolls.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
   const ranges = [];
   let start = rolls[0];
@@ -432,8 +427,7 @@ function compressRollNumbers(rolls) {
     const current = rolls[i];
 
     const samePrefix = getPrefix(current) === getPrefix(prev);
-    const consecutive =
-      getNumber(current) === getNumber(prev) + 1;
+    const consecutive = getNumber(current) === getNumber(prev) + 1;
 
     if (samePrefix && consecutive) {
       prev = current;
@@ -464,7 +458,6 @@ function getBranchFromRoll(roll) {
 }
 
 function generateSummaryHTML(allocation, date) {
-
   let html = `
   <style>
     body { 
@@ -504,19 +497,30 @@ function generateSummaryHTML(allocation, date) {
       border: 1px solid #000;
       font-weight: bold;
     }
-  </style>
 
+  @media print {
+  .page-break {
+    page-break-before: always;
+    break-before: page;
+  }
+}
+  </style>
+  
   <div class="main-header">
     <h2>College of Engineering Chengannur</h2>
     <h5>(Managed by IHRD, A Govt of Kerala Undertaking)</h5>
     <h3>
       First Internal Examination – 
-      ${new Date(date).toLocaleString('default', { month: 'long', year: 'numeric' }).toUpperCase()}
+      ${new Date(date)
+        .toLocaleString("default", { month: "long", year: "numeric" })
+        .toUpperCase()}
     </h3>
 
     <div style="display:flex; justify-content:center; align-items:center; margin-top:10px; font-weight:bold; gap:10px;">
       <span style="text-align:center; font-size:20px; font-weight:bold;">S2</span>
-      <span style="text-align:center; font-size:16px;">${formatWithHalfDay(date)}</span>
+      <span style="text-align:center; font-size:16px;">${formatWithHalfDay(
+        date,
+      )}</span>
     </div>
   </div>
 
@@ -529,14 +533,14 @@ function generateSummaryHTML(allocation, date) {
   const allStudents = [];
 
   Object.entries(allocation).forEach(([hallName, rows]) => {
-    rows.forEach(row => {
-      row.forEach(bench => {
-        bench.forEach(s => {
+    rows.forEach((row) => {
+      row.forEach((bench) => {
+        bench.forEach((s) => {
           if (!s) return;
           allStudents.push({
             roll: s.RollNumber,
             hall: hallName,
-            branch: getBranchFromRoll(s.RollNumber)
+            branch: getBranchFromRoll(s.RollNumber),
           });
         });
       });
@@ -547,8 +551,7 @@ function generateSummaryHTML(allocation, date) {
   // 2️⃣ Sort by Branch → Roll
   // ==========================
   allStudents.sort((a, b) => {
-    if (a.branch !== b.branch)
-      return a.branch.localeCompare(b.branch);
+    if (a.branch !== b.branch) return a.branch.localeCompare(b.branch);
 
     return a.roll.localeCompare(b.roll, undefined, { numeric: true });
   });
@@ -590,9 +593,10 @@ function generateSummaryHTML(allocation, date) {
   // ==========================
   // 4️⃣ Render Table
   // ==========================
-  Object.keys(branchSegments).sort().forEach(branch => {
-
-    html += `
+  Object.keys(branchSegments)
+    .sort()
+    .forEach((branch) => {
+      html += `
       <tr>
         <th colspan="4" class="branch-header">${branch}</th>
       </tr>
@@ -604,25 +608,25 @@ function generateSummaryHTML(allocation, date) {
       </tr>
     `;
 
-    const segments = branchSegments[branch];
+      const segments = branchSegments[branch];
 
-    for (let i = 0; i < segments.length; i += 2) {
-      const seg1 = segments[i];
-      const seg2 = segments[i + 1];
+      for (let i = 0; i < segments.length; i += 2) {
+        const seg1 = segments[i];
+        const seg2 = segments[i + 1];
 
-      html += `<tr>`;
+        html += `<tr>`;
 
-      html += `<td>${seg1.range}</td><td>${seg1.hall}</td>`;
+        html += `<td>${seg1.range}</td><td>${seg1.hall}</td>`;
 
-      if (seg2) {
-        html += `<td>${seg2.range}</td><td>${seg2.hall}</td>`;
-      } else {
-        html += `<td></td><td></td>`;
+        if (seg2) {
+          html += `<td>${seg2.range}</td><td>${seg2.hall}</td>`;
+        } else {
+          html += `<td></td><td></td>`;
+        }
+
+        html += `</tr>`;
       }
-
-      html += `</tr>`;
-    }
-  });
+    });
 
   html += `</table>`;
 
@@ -633,13 +637,13 @@ function generateSummaryHTML(allocation, date) {
     th,td { border:1px solid #000; padding:6px; }
     th { background:#eee; }
   </style>
+  <div class="page-break"></div>
   <h1>College of Engineering Chengannur</h1>
   <h1 style="text-align:center">Hall Allocation Summary</h1>
   <h6>Date: ${formatWithHalfDay(date)}</h6>
   `;
 
   for (const [hall, rows] of Object.entries(allocation)) {
-
     const map = {};
 
     rows.forEach((row) =>
@@ -668,10 +672,9 @@ function generateSummaryHTML(allocation, date) {
 
     Object.entries(map).forEach(([year, batches]) => {
       Object.entries(batches).forEach(([batch, rolls]) => {
-
         const ranges = splitIntoRanges(rolls);
 
-        ranges.forEach(range => {
+        ranges.forEach((range) => {
           html += `
             <tr>
               <td>${year}</td>
@@ -683,16 +686,14 @@ function generateSummaryHTML(allocation, date) {
             </tr>
           `;
         });
-
       });
     });
 
     html += "</table>";
   }
-  
+
   return html;
 }
-
 
 /* =========================================================
    📊 GENERATE SUMMARY HTML
@@ -702,7 +703,7 @@ function getRanges(rolls) {
 
   // Natural sort
   const sorted = [...rolls].sort((a, b) =>
-    a.localeCompare(b, undefined, { numeric: true })
+    a.localeCompare(b, undefined, { numeric: true }),
   );
 
   const ranges = [];
@@ -726,7 +727,12 @@ function getRanges(rolls) {
     const prevPrefix = getPrefix(prev);
     const currPrefix = getPrefix(curr);
 
-    if (prevNum !== null && currNum !== null && prevPrefix === currPrefix && currNum === prevNum + 1) {
+    if (
+      prevNum !== null &&
+      currNum !== null &&
+      prevPrefix === currPrefix &&
+      currNum === prevNum + 1
+    ) {
       prev = curr;
     } else {
       ranges.push(start === prev ? start : `${start}-${prev}`);
@@ -737,7 +743,6 @@ function getRanges(rolls) {
   ranges.push(start === prev ? start : `${start}-${prev}`);
   return ranges.join(", ");
 }
-
 
 /* =========================================================
    🚀 ROUTE: CACHE → GENERATE → STORE → RETURN

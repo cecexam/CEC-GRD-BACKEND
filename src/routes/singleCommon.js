@@ -202,6 +202,7 @@ function allocateSmartColumnWise(data, rooms) {
   return { allocation, remaining };
 }
 
+
 /* ================================
    REBALANCE
 ================================ */
@@ -402,7 +403,8 @@ router.post(
         }
       }
 
-      if (allUnplaced.length > 0) {
+      printMatrix(allocation)
+      if (allUnplaced) {
         console.log("\n===== UNPLACED STUDENTS =====");
         console.log("Total:", allUnplaced.length);
         allUnplaced.forEach(s => console.log(` - ${s.RollNumber} (${s.batch})`));
@@ -423,11 +425,12 @@ router.post(
       });
 
       console.log("Exam Name:", req.body.examName);
-
+      console.log(req.body.type);
+      
       const doc = await db.collection("examAllocations").add({
         name: req.body.examName,
         sems: req.body.years,
-        isElective: req.body.type === "Normal", // Assuming this flag mapping is correct from previous code
+        isElective: req.body.type !== "Normal", // Assuming this flag mapping is correct from previous code
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         meta: {
           totalStudents: students.length,
