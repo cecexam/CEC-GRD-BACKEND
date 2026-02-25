@@ -95,72 +95,59 @@ function allocateColumnWiseAB(students, hallsData) {
       Array.from({ length: columns }, () => [])
     );
 
+    const remainingA = A.length - aIndex;
+    const remainingB = B.length - bIndex;
+    const higherYear = remainingA >= remainingB ? "A" : "B";
+    const lowerYear = remainingA >= remainingB ? "B" : "A";
+
     // Column-wise filling
     for (let col = 0; col < columns; col++) {
       for (let row = 0; row < rows; row++) {
 
         let targetYear = null;
 
-        if (type === "Bench") {
-          // BENCH PATTERN
-          const patternIndex = col % 3; // 0, 1, 2
+        const aExhausted = aIndex >= A.length;
+        const bExhausted = bIndex >= B.length;
 
-          const aExhausted = aIndex >= A.length;
-          const bExhausted = bIndex >= B.length;
-
-          // Override if one year exhausted
-          if (aExhausted && !bExhausted) {
-            // Only B remains -> B _ B (2 per bench)
-            // Slots 0 and 2 get B.
-            if (patternIndex === 0 || patternIndex === 2) targetYear = "B";
-            else targetYear = null;
-          } else if (!aExhausted && bExhausted) {
-            // Only A remains -> A _ A (2 per bench)
-            // Slots 0 and 2 get A.
-            if (patternIndex === 0 || patternIndex === 2) targetYear = "A";
-            else targetYear = null;
-          } else {
-            // Standard Alternating
-            if (hallIndex % 2 === 0) {
-              // First Room -> A B A
-              if (patternIndex === 0) targetYear = "A";
-              else if (patternIndex === 1) targetYear = "B";
-              else targetYear = "A";
-            } else {
-              // Next Room -> B A B
-              if (patternIndex === 0) targetYear = "B";
-              else if (patternIndex === 1) targetYear = "A";
-              else targetYear = "B";
+        // Override if one year exhausted
+        if (aExhausted && !bExhausted) {
+          // Only B remains -> Alternate columns
+          let leftIsB = false;
+          if (col > 0) {
+            const prev = matrix[row][col - 1];
+            if (prev && prev.length > 0 && prev[0].year === "B") {
+              leftIsB = true;
             }
           }
+          targetYear = leftIsB ? null : "B";
+        } else if (!aExhausted && bExhausted) {
+          // Only A remains -> Alternate columns
+          let leftIsA = false;
+          if (col > 0) {
+            const prev = matrix[row][col - 1];
+            if (prev && prev.length > 0 && prev[0].year === "A") {
+              leftIsA = true;
+            }
+          }
+          targetYear = leftIsA ? null : "A";
+        } else if (!aExhausted && !bExhausted) {
+          if (type === "Bench") {
+            // BENCH PATTERN
+            const patternIndex = col % 3; // 0, 1, 2
 
-        } else {
-          // CHAIR PATTERN
-          const patternIndex = col % 2; // 0, 1
-
-          const aExhausted = aIndex >= A.length;
-          const bExhausted = bIndex >= B.length;
-
-          // Override if one year exhausted
-          if (aExhausted && !bExhausted) {
-            // Only B remains -> Request: B _ B B _ B
-            // This acts like a 3-column pattern: fill 0 and 2, skip 1.
-            const exPattern = col % 3;
-            if (exPattern === 0 || exPattern === 2) targetYear = "B";
-            else targetYear = null; // Skip middle
-          } else if (!aExhausted && bExhausted) {
-            // Only A remains -> Request: A _ A A _ A
-            const exPattern = col % 3;
-            if (exPattern === 0 || exPattern === 2) targetYear = "A";
-            else targetYear = null;
-          } else {
-            // Standard Alternating
-            if (hallIndex % 2 === 0) {
-              // First Room -> A B
-              targetYear = patternIndex === 0 ? "A" : "B";
+            if (patternIndex === 0 || patternIndex === 2) {
+              targetYear = higherYear;
             } else {
-              // Next Room -> B A
-              targetYear = patternIndex === 0 ? "B" : "A";
+              targetYear = lowerYear;
+            }
+          } else {
+            // CHAIR PATTERN
+            const patternIndex = col % 2; // 0, 1
+
+            if (patternIndex === 0) {
+              targetYear = higherYear;
+            } else {
+              targetYear = lowerYear;
             }
           }
         }
@@ -173,7 +160,7 @@ function allocateColumnWiseAB(students, hallsData) {
             student = A[aIndex++];
           }
           // Strict pattern: if A is exhausted, we do NOT fill with B here to maintain pattern
-        } else {
+        } else if (targetYear === "B") {
           if (bIndex < B.length) {
             student = B[bIndex++];
           }
@@ -467,7 +454,7 @@ router.post(
           name,
           sems,
 
-          isElective: types !== "Normal",
+          isElective: false,
 
           examDate,
         });

@@ -231,35 +231,44 @@ function generateSeatingPlan(halls, groups, rollToSubject) {
 
     const seats = Array.from({ length: rows }, () => Array(columns).fill(""));
 
-    // Expected Logic: Column-wise fill with interleaved subjects
+    let prevSubject = null;
 
+    // Expected Logic: Column-wise fill with interleaved homogenizing subjects
     for (let c = 0; c < columns; c++) {
+      let bestSubject = null;
+      let maxRemaining = 0;
 
-      let groupIndex = (startObjIndex + c) % order.length;
-
-      for (let r = 0; r < rows; r++) {
-
-        let placed = false;
-        let attempts = 0;
-        let currentKeyIndex = groupIndex;
-
-        while (attempts < order.length) {
-          const k = order[currentKeyIndex];
-
-          if (pointers[k] < groups[k].length) {
-            seats[r][c] = groups[k][pointers[k]++];
-            placed = true;
-            break;
-          }
-
-          currentKeyIndex = (currentKeyIndex + 1) % order.length;
-          attempts++;
+      for (const subj of order) {
+        const remaining = groups[subj].length - pointers[subj];
+        if (remaining > maxRemaining && subj !== prevSubject) {
+          maxRemaining = remaining;
+          bestSubject = subj;
         }
       }
+
+      if (!bestSubject) {
+        // If the only subject with remaining students is prevSubject, skip this column to avoid adjacency
+        const prevRemaining = prevSubject ? (groups[prevSubject].length - pointers[prevSubject]) : 0;
+        if (prevRemaining > 0) {
+          prevSubject = null; // Next column can use it safely
+          continue;
+        } else {
+          break; // All students placed!
+        }
+      }
+
+      // Fill entire column with bestSubject to prevent column mixups
+      for (let r = 0; r < rows; r++) {
+        if (pointers[bestSubject] < groups[bestSubject].length) {
+          seats[r][c] = groups[bestSubject][pointers[bestSubject]++];
+        }
+      }
+
+      prevSubject = bestSubject;
     }
 
-    // seats = randomizeSeatsBySubject(seats, rollToSubject);
-    const optimizedSeats = fixSameSubjectAdjacency(seats, rollToSubject);
+    // Removed `fixSameSubjectAdjacency` as it swaps students across bounds creating branch mixups.
+    const optimizedSeats = seats;
     printHallAllocation(hall.HallName, optimizedSeats, rollToSubject);
 
     result.push({
@@ -286,7 +295,7 @@ function printHallAllocation(name, seats, rollToSubject) {
 
       if (!s) return " --- ";
 
-      return `${rollToSubject[s]}-${s}`;
+      return `${s}`;
     });
 
     console.log(`Row ${i + 1}:`, line.join(" | "));
@@ -337,9 +346,11 @@ router.post(
   "/",
   upload.fields([{ name: "students" }, { name: "halls" }]),
   async (req, res) => {
+    console.log("sdfghjkl;'");
+
     try {
       const students = excelToCsv(fs.readFileSync(req.files.students[0].path, "utf8"));
-      const halls = shuffleArray(excelToCsv(fs.readFileSync(req.files.halls[0].path, "utf8")));
+      const halls = excelToCsv(fs.readFileSync(req.files.halls[0].path, "utf8"));
 
       const groups = groupStudentsBySubject(students);
       const rollToSubject = buildRollToSubject(students);
@@ -355,21 +366,21 @@ router.post(
 
       console.log(req.body.examDate);
 
-      const doc = await db.collection("examAllocations").add({
-        name: req.body.examName,
-        sems: req.body.years,
-        isElective: req.body.type !== "Normal",
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        meta: {
-          totalStudents: students.length,
-          totalHalls: halls.length,
-          studentsPerBench: raw[0]?.maxBench || 0
-        },
-        halls: firestoreHalls,
-        examDate: req.body.examDate
-      });
+      // const doc = await db.collection("examAllocations").add({
+      //   name: req.body.examName,
+      //   sems: req.body.years,
+      //   isElective: req.body.type !== "Normal",
+      //   createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      //   meta: {
+      //     totalStudents: students.length,
+      //     totalHalls: halls.length,
+      //     studentsPerBench: raw[0]?.maxBench || 0
+      //   },
+      //   halls: firestoreHalls,
+      //   examDate: req.body.examDate
+      // });
 
-      res.json({ success: true, documentId: doc.id });
+      res.json({ success: true});
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: err.message });

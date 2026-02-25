@@ -509,7 +509,6 @@ function generateSummaryHTML(allocation, date) {
   <div class="main-header">
     <h2>College of Engineering Chengannur</h2>
     <h5>(Managed by IHRD, A Govt of Kerala Undertaking)</h5>
-    <h5>Generated using CEC-GRID</h5>
     <h3>
       First Internal Examination – 
       ${new Date(date)

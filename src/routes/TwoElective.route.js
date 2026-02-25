@@ -9,6 +9,7 @@ const upload = multer({ dest: "uploads/" });
 
 const { admin, db } = require("../config/firebase");
 
+const StudYear = {}
 /* ================================
    CSV PARSER
 ================================ */
@@ -94,72 +95,59 @@ function allocateColumnWiseAB(students, hallsData) {
       Array.from({ length: columns }, () => [])
     );
 
+    const remainingA = A.length - aIndex;
+    const remainingB = B.length - bIndex;
+    const higherYear = remainingA >= remainingB ? "A" : "B";
+    const lowerYear = remainingA >= remainingB ? "B" : "A";
+
     // Column-wise filling
     for (let col = 0; col < columns; col++) {
       for (let row = 0; row < rows; row++) {
 
         let targetYear = null;
 
-        if (type === "Bench") {
-          // BENCH PATTERN
-          const patternIndex = col % 3; // 0, 1, 2
+        const aExhausted = aIndex >= A.length;
+        const bExhausted = bIndex >= B.length;
 
-          const aExhausted = aIndex >= A.length;
-          const bExhausted = bIndex >= B.length;
-
-          // Override if one year exhausted
-          if (aExhausted && !bExhausted) {
-            // Only B remains -> B _ B (2 per bench)
-            // Slots 0 and 2 get B.
-            if (patternIndex === 0 || patternIndex === 2) targetYear = "B";
-            else targetYear = null;
-          } else if (!aExhausted && bExhausted) {
-            // Only A remains -> A _ A (2 per bench)
-            // Slots 0 and 2 get A.
-            if (patternIndex === 0 || patternIndex === 2) targetYear = "A";
-            else targetYear = null;
-          } else {
-            // Standard Alternating
-            if (hallIndex % 2 === 0) {
-              // First Room -> A B A
-              if (patternIndex === 0) targetYear = "A";
-              else if (patternIndex === 1) targetYear = "B";
-              else targetYear = "A";
-            } else {
-              // Next Room -> B A B
-              if (patternIndex === 0) targetYear = "B";
-              else if (patternIndex === 1) targetYear = "A";
-              else targetYear = "B";
+        // Override if one year exhausted
+        if (aExhausted && !bExhausted) {
+          // Only B remains -> Alternate columns
+          let leftIsB = false;
+          if (col > 0) {
+            const prev = matrix[row][col - 1];
+            if (prev && prev.length > 0 && prev[0].year === "B") {
+              leftIsB = true;
             }
           }
+          targetYear = leftIsB ? null : "B";
+        } else if (!aExhausted && bExhausted) {
+          // Only A remains -> Alternate columns
+          let leftIsA = false;
+          if (col > 0) {
+            const prev = matrix[row][col - 1];
+            if (prev && prev.length > 0 && prev[0].year === "A") {
+              leftIsA = true;
+            }
+          }
+          targetYear = leftIsA ? null : "A";
+        } else if (!aExhausted && !bExhausted) {
+          if (type === "Bench") {
+            // BENCH PATTERN
+            const patternIndex = col % 3; // 0, 1, 2
 
-        } else {
-          // CHAIR PATTERN
-          const patternIndex = col % 2; // 0, 1
-
-          const aExhausted = aIndex >= A.length;
-          const bExhausted = bIndex >= B.length;
-
-          // Override if one year exhausted
-          if (aExhausted && !bExhausted) {
-            // Only B remains -> Request: B _ B B _ B
-            // This acts like a 3-column pattern: fill 0 and 2, skip 1.
-            const exPattern = col % 3;
-            if (exPattern === 0 || exPattern === 2) targetYear = "B";
-            else targetYear = null; // Skip middle
-          } else if (!aExhausted && bExhausted) {
-            // Only A remains -> Request: A _ A A _ A
-            const exPattern = col % 3;
-            if (exPattern === 0 || exPattern === 2) targetYear = "A";
-            else targetYear = null;
-          } else {
-            // Standard Alternating
-            if (hallIndex % 2 === 0) {
-              // First Room -> A B
-              targetYear = patternIndex === 0 ? "A" : "B";
+            if (patternIndex === 0 || patternIndex === 2) {
+              targetYear = higherYear;
             } else {
-              // Next Room -> B A
-              targetYear = patternIndex === 0 ? "B" : "A";
+              targetYear = lowerYear;
+            }
+          } else {
+            // CHAIR PATTERN
+            const patternIndex = col % 2; // 0, 1
+
+            if (patternIndex === 0) {
+              targetYear = higherYear;
+            } else {
+              targetYear = lowerYear;
             }
           }
         }
@@ -171,25 +159,11 @@ function allocateColumnWiseAB(students, hallsData) {
           if (aIndex < A.length) {
             student = A[aIndex++];
           }
-          // Strict pattern: no fallback to B here
+          // Strict pattern: if A is exhausted, we do NOT fill with B here to maintain pattern
         } else if (targetYear === "B") {
           if (bIndex < B.length) {
             student = B[bIndex++];
           }
-        }
-
-        // Strict Fallback Logic (Adjacency Check)
-        if (!student && targetYear) {
-          // No student found for target year (exhausted?), but wait, handled by override above?
-          // Not completely. If override says null, we skip.
-          // If override says A but A is empty (shouldn't happen with override logic), then empty.
-          // But if specific slot didn't trigger override yet?
-          // Override logic relies on aExhausted check at column start. 
-          // Logic seems consistent.
-          // But let's keep the fallback check just in case, or rather just rely on pattern.
-          // The previous TwoCommon code didn't have extensive "if !student" logic because logic was tight.
-          // Wait, I see I removed the explicit fallback block in TwoCommon because 
-          // the exhaustion override handles the "filling" strategy. 
         }
 
         if (student) {
@@ -204,7 +178,7 @@ function allocateColumnWiseAB(students, hallsData) {
     report.push({
       hall: hall.HallName,
       placed: hallPlacedCount,
-      capacity: rows * columns,
+      capacity: rows * columns, // Total physical slots, though pattern might limit actual usable
       type: type
     });
   });
@@ -232,6 +206,7 @@ function allocateColumnWiseAB(students, hallsData) {
 ================================ */
 function printAllocation(allocation, report, unplaced) {
   console.log("\n========== SEATING ARRANGEMENT ==========\n");
+
 
   for (const [hall, rows] of Object.entries(allocation)) {
     console.log(`🏫 Hall: ${hall}\n`);
@@ -279,18 +254,13 @@ function printAllocation(allocation, report, unplaced) {
 /* ================================
    FIRESTORE SERIALIZER
 ================================ */
-function serializeAllocationForFirestore(allocation, report) {
+function serializeAllocationForFirestore(allocation) {
   const result = {};
 
   for (const [hall, rows] of Object.entries(allocation)) {
-    // Find metadata from report
-    const hallMeta = report.find(r => r.hall === hall);
-    const type = hallMeta ? hallMeta.type : "Bench"; // Default to Bench
-
     const hallData = {
       rows: rows.length,
       columns: rows[0]?.length || 0,
-      type: type
     };
 
     rows.forEach((row, r) => {
@@ -310,7 +280,6 @@ function serializeAllocationForFirestore(allocation, report) {
             name:
               s.StudentName ||
               s.Name ||
-              s.Student ||
               null,
 
             subject: s.subject || null,
@@ -371,6 +340,8 @@ router.post(
         const year = i === 0 ? "A" : "B";
 
         const students = await parseCSV(file);
+
+
 
         yearMap[year] = students
           .filter(s => {
@@ -434,9 +405,13 @@ router.post(
          ALLOCATE SEATS
       ------------------------------ */
 
-      const { allocation, report, unplaced } = allocateColumnWiseAB(ordered, hallsData);
+      const { allocation, report, unplaced } =
+        allocateColumnWiseAB(
+          ordered,
+          hallsData
+        );
 
-      // Print final seating
+      // // Print final seating
       printAllocation(allocation, report, unplaced);
 
       if (unplaced.total > 0) {
@@ -470,8 +445,7 @@ router.post(
 
           halls:
             serializeAllocationForFirestore(
-              allocation,
-              report
+              allocation
             ),
 
           createdAt:
@@ -480,14 +454,14 @@ router.post(
           name,
           sems,
 
-          isElective: types !== "Normal",
+          isElective: true,
 
           examDate,
         });
 
       res.json({
         success: true,
-        message: "Allocation completed",
+        message: "Allocation completed successfully",
         report: report,
         unplaced: unplaced
       });

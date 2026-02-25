@@ -85,8 +85,8 @@ function generateHallHTML(allocation, date) {
             row: rIdx + 1,
             seatLabel: String.fromCharCode(65 + rIdx) + (bIdx + 1),
           });
-        })
-      )
+        }),
+      ),
     );
 
     /* Group by Year */
@@ -98,7 +98,7 @@ function generateHallHTML(allocation, date) {
     });
 
     Object.values(yearMap).forEach((arr) =>
-      arr.sort((a, b) => a.name.localeCompare(b.name))
+      arr.sort((a, b) => a.name.localeCompare(b.name)),
     );
 
     /* Base HTML */
@@ -150,233 +150,110 @@ th {
     margin-right: 4mm;
   }
 
-   
+   .page-break {
+    page-break-before: always;
+    break-before: page;
+  }
 
 }
 
 /* ================= GRID (BIG SIZE) ================= */
 
 .grid-container {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 8px;
-  align-items: center;
-  width: 100%;
-  page-break-inside: avoid;
-}
-
-/* Row */
-
-.row-visual {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 6px;
-  align-items: center;
-  page-break-inside: avoid;
-}
-
-/* Row Label */
-
-.row-label-visual {
-  font-weight: bold;
-  width: 28px;
-  font-size: 13px;
-}
-
-/* Bench */
-
-.bench-visual {
-  border: 1.5px solid #333;
-  padding: 4px;
-  display: flex;
-  gap: 5px;
-  background: #fff;
-}
-
-/* Chair */
-
-.chair-visual {
-  border: 1.5px solid #555;
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f8f8f8;
-  font-size: 10px;
-  border-radius: 3px;
-  flex-direction: column;
-}
-
-/* Seat */
-
-.seat-visual {
-  border: 1px dashed #aaa;
-  padding: 3px;
-  font-size: 10px;
-  min-width: 38px;
-  text-align: center;
-  background: #fff;
-}
-
-/* Empty */
-
-.empty-seat {
-  color: #bbb;
-}
-
-/* Roll */
-
-.seat-roll {
-  font-weight: bold;
-  font-size: 10px;
-  line-height: 1.1;
-}
-
-/* Year */
-
-.seat-year {
-  font-size: 9px;
-  color: #666;
-  line-height: 1;
+  margin-top: 20px;
+   
 }
 
 .direction-board {
-  width: 100%;
   text-align: center;
   font-weight: bold;
-  font-size: 15px;
-  color: white;
- 
-  border-radius: 6px;
-  letter-spacing: 1px;
- 
-  margin-bottom: 10px;
+  margin-bottom: 15px;
+  border: 2px solid black;
+  padding: 8px;
 }
+
+.row-visual {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.row-label-visual {
+  width: 30px;
+  font-weight: bold;
+  text-align: center;
+}
+
+.seat-box {
+  border-radius:5px;
+  width: 80px;
+  height: 50px;
+  border: 2px solid black;
+  margin-right: 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  font-size: 12px;
+}
+
+.empty-seat {
+  background: #f5f5f5;
+  color: #999;
+}
+
+.seat-roll {
+  font-weight: bold;
+}
+
+.seat-year {
+  font-size: 10px;
+}
+
 
 </style>
 </head>
 
 <body>
-
-<h2>College of Engineering Chengannur</h2>
-<h2>First Series Examination Feb26</h2>
-<h2>Hall Seating Arrangement (${hallType})</h2>
-<h2>${hallName}</h2>
-<h5>Exam Date: ${formatWithHalfDay(date)}</h5>
 `;
 
     /* ================= SEATING LIST ================= */
 
-    for (const year of Object.keys(yearMap).sort()) {
-      html += `
-<h3>Year: ${year}</h3>
-
-<table>
-<tr>
-  <th>Sl</th>
-  <th>Name</th>
-  <th>Roll</th>
-  <th>Seat</th>
-</tr>
-`;
-
-      yearMap[year].forEach((s, i) => {
-        html += `
-<tr>
-  <td>${i + 1}</td>
-  <td>${s.name}</td>
-  <td>${s.roll}</td>
-  <td>${s.seatLabel} (R${s.row})</td>
-</tr>
-`;
-      });
-
-      html += `</table>`;
-    }
-
     /* ================= GRID ================= */
 
     html += `
-<div class="page-break"></div>
 
 <h2>Seating Grid [${hallName}]</h2>
 <h5>Exam Date: ${formatWithHalfDay(date)}</h5>
 
 <div class="grid-container">
-<div class="direction-board">
-⬆ ALL EYES THIS WAY ⬆
-</div>
-
+  <div style="text-align: center; font-weight: bold; margin-bottom: 15px; padding: 8px;">
+    Black Board
+  </div>
 `;
 
     rows.forEach((row, r) => {
       html += `<div class="row-visual">`;
 
-      const rowLabel = 1 + r;
+      const rowLabel = r + 1;
 
       html += `<div class="row-label-visual">${rowLabel}</div>`;
 
-      /* BENCH MODE */
+      row.forEach((seatData) => {
+        const student = seatData && seatData.length ? seatData[0] : null;
 
-      if (hallType === "Bench") {
-        const benchCount = Math.ceil(row.length / 3);
+        html += `<div class="seat-box ${student ? "" : "empty-seat"}">`;
 
-        for (let b = 0; b < benchCount; b++) {
-          html += `<div class="bench-visual">`;
-
-          for (let k = 0; k < 3; k++) {
-            const colIdx = b * 3 + k;
-
-            if (colIdx >= row.length) break;
-
-            const seatData = row[colIdx];
-            const student =
-              seatData && seatData.length ? seatData[0] : null;
-
-            html += `<div class="seat-visual ${student ? "" : "empty-seat"
-              }">`;
-
-            if (student) {
-              html += `
-<span class="seat-roll">${student.RollNumber || "?"}</span>
-<span class="seat-year">${student.year}</span>
-`;
-            } else {
-              html += "Empty";
-            }
-
-            html += `</div>`;
-          }
-
-          html += `</div>`;
+        if (student) {
+          html += `
+        <span class="seat-roll">${student.RollNumber || "?"}</span>
+      `;
+        } else {
+          html += `Empty`;
         }
 
-      }
-
-      /* CHAIR MODE */
-
-      else {
-        row.forEach((seatData) => {
-          const student =
-            seatData && seatData.length ? seatData[0] : null;
-
-          html += `<div class="chair-visual ${student ? "" : "empty-seat"
-            }">`;
-
-          if (student) {
-            html += `
-<span class="seat-roll">${student.RollNumber || "?"}</span>
-<span class="seat-year">${student.year}</span>
-`;
-          } else {
-            html += "Empty";
-          }
-
-          html += `</div>`;
-        });
-      }
+        html += `</div>`;
+      });
 
       html += `</div>`;
     });
@@ -386,17 +263,13 @@ th {
 `;
 
     /* ================= ATTENDANCE ================= */
-
     html += `
 <div class="page-break"></div>
 
-<h2>Attendance Sheet</h2>
+<h2>Attendance Sheet [${hallName}]</h2>
 <h5>Exam Date: ${formatWithHalfDay(date)}</h5>
-
-<h2>${hallName}</h2>
 `;
-
-    for (const year of Object.keys(yearMap).sort()) {
+    for (const year of Object.keys(yearMap).sort((a, b) => a - b)) {
       html += `
 <h3>Year: ${year}</h3>
 
@@ -409,7 +282,36 @@ th {
 </tr>
 `;
 
-      yearMap[year].forEach((s, i) => {
+      // 🔥 Strict Roll Number Sorting
+      const sortedStudents = [...yearMap[year]].sort((a, b) => {
+        const regex = /^([A-Z]+\d+)([A-Z])(\d+)$/;
+
+        const matchA = a.roll.match(regex);
+        const matchB = b.roll.match(regex);
+
+        // Fallback if pattern doesn't match
+        if (!matchA || !matchB) {
+          return a.roll.localeCompare(b.roll, undefined, { numeric: true });
+        }
+
+        const [, prefixA, batchA, numA] = matchA;
+        const [, prefixB, batchB, numB] = matchB;
+
+        // 1️⃣ Compare prefix (EC24 etc)
+        if (prefixA !== prefixB) {
+          return prefixA.localeCompare(prefixB);
+        }
+
+        // 2️⃣ Compare batch letter (A before B)
+        if (batchA !== batchB) {
+          return batchA.localeCompare(batchB);
+        }
+
+        // 3️⃣ Compare numeric part
+        return Number(numA) - Number(numB);
+      });
+
+      sortedStudents.forEach((s, i) => {
         html += `
 <tr>
   <td>${i + 1}</td>
@@ -423,13 +325,7 @@ th {
       html += `</table>`;
     }
 
-    /* CLOSE */
-
     html += `
-</body>
-</html>
-`;
-html += `
   <br><br>
   <table style="width:100%; margin-bottom:20px;">
     <tr>
@@ -441,8 +337,7 @@ html += `
   </table>
   <table style="width:100%; border:none; margin-top:40px;">
     <tr style="border:none;">
-      <td style="border:none; width:50%;">
-
+      <td style="border:none; width:50%; text-align:left;">
         Name of Invigilator: ______________________________
       </td>
       <td style="border:none; width:50%; text-align:right;">
@@ -451,7 +346,6 @@ html += `
     </tr>
   </table>
 `;
-
 
     hallHTMLs[hallName] = html;
   }
@@ -529,6 +423,120 @@ function generateSummaryHTML(allocation, date) {
 
     html += `</table>`;
   }
+
+  /* =====================================================
+    PAGE BREAK
+ ===================================================== */
+  const yearBranchHall = {};
+
+  for (const [hallName, rows] of Object.entries(allocation)) {
+    for (const row of rows) {
+      for (const bench of row) {
+        for (const s of bench) {
+          if (!s) continue;
+
+          let yearNumber = Number(s.year);
+          if (isNaN(yearNumber)) {
+            yearNumber = s.year === "A" ? 4 : 3;
+          }
+
+          const branchMatch = s.RollNumber.match(/^[A-Za-z]+/);
+          const branch = branchMatch ? branchMatch[0] : "UNKNOWN";
+          const batch = s.Batch || "UNKNOWN";
+
+          yearBranchHall[yearNumber] ??= {};
+          yearBranchHall[yearNumber][branch] ??= {};
+          yearBranchHall[yearNumber][branch][hallName] ??= {};
+          yearBranchHall[yearNumber][branch][hallName][batch] ??= [];
+
+          yearBranchHall[yearNumber][branch][hallName][batch].push(s.RollNumber);
+        }
+      }
+    }
+  }
+
+html = `
+
+<table border="1" cellspacing="0" cellpadding="3">
+    <tr>
+        <th>Year</th>
+        <th>Batch</th>
+        <th>RollNo</th>
+        <th>HallNo</th>
+    </tr>
+`;
+
+Object.keys(yearBranchHall)
+  .sort((a, b) => a - b)
+  .forEach((year) => {
+
+    const branches = yearBranchHall[year];
+
+    // Collect all batches across all branches for this year
+    let yearRowCount = 0;
+
+    Object.keys(branches).forEach(branch => {
+      Object.keys(branches[branch]).forEach(hall => {
+        Object.keys(branches[branch][hall]).forEach(batch => {
+          yearRowCount++;
+        });
+      });
+    });
+
+    let yearPrinted = false;
+
+    // Create batchMap → batch grouped across branches
+    const batchMap = {};
+
+    Object.keys(branches).forEach(branch => {
+      Object.keys(branches[branch]).forEach(hall => {
+        Object.keys(branches[branch][hall]).forEach(batch => {
+          if (!batchMap[batch]) batchMap[batch] = [];
+          batchMap[batch].push({
+            hall,
+            rolls: branches[branch][hall][batch]
+          });
+        });
+      });
+    });
+
+    Object.keys(batchMap).sort().forEach((batch) => {
+
+      const batchRows = batchMap[batch];
+      const batchRowCount = batchRows.length;
+
+      let batchPrinted = false;
+
+      batchRows.forEach(({ hall, rolls }) => {
+
+        html += `<tr>`;
+
+        // Year rowspan
+        if (!yearPrinted) {
+          html += `<td rowspan="${yearRowCount}">${year}</td>`;
+          yearPrinted = true;
+        }
+
+        // Batch rowspan
+        if (!batchPrinted) {
+          html += `<td rowspan="${batchRowCount}">${batch}</td>`;
+          batchPrinted = true;
+        }
+
+        html += `
+            <td>${rolls.sort().join(", ")}</td>
+            <td>${hall}</td>
+        </tr>`;
+      });
+
+    });
+
+  });
+
+html += `
+</table>
+`;
+
 
   return html;
 }
