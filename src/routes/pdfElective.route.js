@@ -537,18 +537,19 @@ html += `
 </table>
 `;
 
-   /* =====================================================
-   🏫 HALL WISE SUMMARY TABLE
+/* =====================================================
+   🏫 HALL WISE YEAR SUMMARY
 ===================================================== */
 
 html += `
 <div class="page-break"></div>
 
-<h3>Hall Wise Student Summary</h3>
+<h3>Hall Wise Year Summary</h3>
 
 <table>
 <tr>
   <th>Hall</th>
+  <th>Year</th>
   <th>Roll Numbers</th>
   <th>Total Students</th>
   <th>Total Absentees</th>
@@ -557,27 +558,37 @@ html += `
 
 for (const [hallName, rows] of Object.entries(allocation)) {
 
-  const rolls = [];
+  const yearMap = {};
 
   rows.forEach(row =>
     row.forEach(bench =>
       bench.forEach(s => {
         if (!s) return;
-        rolls.push(s.RollNumber);
+
+        const year = s.year || "UNKNOWN";
+
+        yearMap[year] ??= [];
+        yearMap[year].push(s.RollNumber);
       })
     )
   );
 
-  rolls.sort();
+  Object.keys(yearMap)
+    .sort((a,b) => a - b)
+    .forEach((year) => {
 
-  html += `
+      const rolls = yearMap[year].sort();
+
+      html += `
 <tr>
   <td><b>${hallName}</b></td>
+  <td><b>${year}</b></td>
   <td style="text-align:left;">${rolls.join(", ")}</td>
   <td><b>${rolls.length}</b></td>
   <td></td>
 </tr>
 `;
+    });
 }
 
 html += `</table>`;
