@@ -537,6 +537,50 @@ html += `
 </table>
 `;
 
+   /* =====================================================
+   🏫 HALL WISE SUMMARY TABLE
+===================================================== */
+
+html += `
+<div class="page-break"></div>
+
+<h3>Hall Wise Student Summary</h3>
+
+<table>
+<tr>
+  <th>Hall</th>
+  <th>Roll Numbers</th>
+  <th>Total Students</th>
+  <th>Total Absentees</th>
+</tr>
+`;
+
+for (const [hallName, rows] of Object.entries(allocation)) {
+
+  const rolls = [];
+
+  rows.forEach(row =>
+    row.forEach(bench =>
+      bench.forEach(s => {
+        if (!s) return;
+        rolls.push(s.RollNumber);
+      })
+    )
+  );
+
+  rolls.sort();
+
+  html += `
+<tr>
+  <td><b>${hallName}</b></td>
+  <td style="text-align:left;">${rolls.join(", ")}</td>
+  <td><b>${rolls.length}</b></td>
+  <td></td>
+</tr>
+`;
+}
+
+html += `</table>`;
 
   return html;
 }
