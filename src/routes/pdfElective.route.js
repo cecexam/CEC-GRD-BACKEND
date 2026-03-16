@@ -38,6 +38,7 @@ function reconstructAllocation(hallsData) {
             RollNumber: s.roll,
             year: s.year,
             Batch: s.batch,
+            subject: s.subject,
           });
         }
       });
@@ -358,71 +359,75 @@ th {
    📊 GENERATE ROLL SUMMARY HTML
 ===================================================== */
 function generateSummaryHTML(allocation, date) {
-  let html = `
-  <style>
-    body { font-family: Arial; font-size: 13px; }
-    h2 { text-align: center; }
-    table { width: 100%; border-collapse: collapse; margin-bottom:25px; }
-    th, td { border: 1px solid #000; padding: 8px; }
-    th { background: #eee; }
-  </style>
-    <h2>College of Engineering Chengannur</h2>
-    <h2>First Series Examination Feb26</h2>
-    <h2>Hall Summary(Generated Using CEC-GRID)</h2>
-    <h5>Exam Date:${formatWithHalfDay(date)}</h5>
-  `;
+  const [datePart, timePart] = date ? date.split("T") : ["", ""];
+  const hour = timePart ? parseInt(timePart.split(":")[0], 10) : 0;
+  const sessionLabel = hour < 12 ? "FN" : "AN";
+  let html = "";
+  // let html = `
+  // <style>
+  //   body { font-family: Arial; font-size: 13px; }
+  //   h2 { text-align: center; }
+  //   table { width: 100%; border-collapse: collapse; margin-bottom:25px; }
+  //   th, td { border: 1px solid #000; padding: 8px; }
+  //   th { background: #eee; }
+  // </style>
+  //   <h2>College of Engineering Chengannur</h2>
+  //   <h2>First Series Examination Feb26</h2>
+  //   <h2>Hall Summary(Generated Using CEC-GRID)</h2>
+  //   <h5>Exam Date:${datePart} | Session: ${sessionLabel}</h5>
+  // `;
 
-  for (const [hallName, rows] of Object.entries(allocation)) {
-    const map = {};
+  // for (const [hallName, rows] of Object.entries(allocation)) {
+  //   const map = {};
 
-    rows.forEach((row) =>
-      row.forEach((bench) =>
-        bench.forEach((s) => {
-          if (!s) return;
+  //   rows.forEach((row) =>
+  //     row.forEach((bench) =>
+  //       bench.forEach((s) => {
+  //         if (!s) return;
 
-          const roll = s.RollNumber;
-          const year = s.year || "UNKNOWN";
-          const batch = s.Batch || "UNKNOWN";
+  //         const roll = s.RollNumber;
+  //         const year = s.year || "UNKNOWN";
+  //         const batch = s.Batch || "UNKNOWN";
 
-          map[year] ??= {};
-          map[year][batch] ??= [];
+  //         map[year] ??= {};
+  //         map[year][batch] ??= [];
 
-          map[year][batch].push(roll);
-        }),
-      ),
-    );
+  //         map[year][batch].push(roll);
+  //       }),
+  //     ),
+  //   );
 
-    html += `
-    <h3>Hall: ${hallName}</h3>
+  //   html += `
+  //   <h3>Hall: ${hallName}</h3>
 
-    <table>
-      <tr>
-        <th>Year</th>
-        <th>Batch</th>
-        <th>Roll Numbers</th>
-        <th>Absentees</th>
-      </tr>
-    `;
+  //   <table>
+  //     <tr>
+  //       <th>Year</th>
+  //       <th>Batch</th>
+  //       <th>Roll Numbers</th>
+  //       <th>Absentees</th>
+  //     </tr>
+  //   `;
 
-    Object.keys(map)
-      .sort()
-      .forEach((year) =>
-        Object.keys(map[year])
-          .sort()
-          .forEach((batch) => {
-            html += `
-          <tr>
-            <td><b>${year == "A" ? 4 : 2}</b></td>
-            <td><b>${batch}</b></td>
-            <td style="text-align:left;"><b>${map[year][batch].sort().join(", ")}</b></td>
-            <td></td>
-          </tr>
-          `;
-          }),
-      );
+  //   Object.keys(map)
+  //     .sort()
+  //     .forEach((year) =>
+  //       Object.keys(map[year])
+  //         .sort()
+  //         .forEach((batch) => {
+  //           html += `
+  //         <tr>
+  //           <td><b>${year == "A" ? 4 : 2}</b></td>
+  //           <td><b>${batch}</b></td>
+  //           <td style="text-align:left;"><b>${map[year][batch].sort().join(", ")}</b></td>
+  //           <td></td>
+  //         </tr>
+  //         `;
+  //         }),
+  //     );
 
-    html += `</table>`;
-  }
+  //   html += `</table>`;
+  // }
 
   /* =====================================================
     PAGE BREAK
@@ -455,143 +460,156 @@ function generateSummaryHTML(allocation, date) {
     }
   }
 
-html = `
+  Object.keys(yearBranchHall)
+    .sort((a, b) => Number(a) - Number(b))
+    .forEach((year) => {
+      const branches = yearBranchHall[year];
 
-<table border="1" cellspacing="0" cellpadding="3">
-    <tr>
-        <th>Year</th>
-        <th>Batch</th>
-        <th>RollNo</th>
-        <th>HallNo</th>
+      html += `
+<div class="page-break"></div>
+
+<div style="border: 2px solid #000; padding: 10px; margin-bottom: 20px; background: #f9f9f9;">
+  <h1 style="margin:0; font-size: 20px;">College of Engineering Chengannur</h1>
+  <h2 style="margin:5px 0; font-size: 18px;">Roll Number Wise Allocation - YEAR ${year}</h2>
+  <div style="display: flex; justify-content: space-between; font-weight: bold; margin-top: 10px; border-top: 1px solid #ccc; padding-top: 5px;">
+    <span>Date: ${datePart}</span>
+    <span>Session: ${sessionLabel}</span>
+  </div>
+</div>
+
+<table border="1" cellspacing="0" cellpadding="3" style="width:100%; border-collapse:collapse; table-layout: fixed;">
+    <thead>
+    <tr style="background: #333; color: #fff;">
+        <th style="width: 10%; border: 1px solid #000; padding: 8px; color: #000;">Batch</th>
+        <th style="width: 75%; border: 1px solid #000; padding: 8px; color: #000;">Roll Numbers</th>
+        <th style="width: 15%; border: 1px solid #000; padding: 8px; color: #000;">Hall</th>
     </tr>
+    </thead>
+    <tbody>
 `;
 
-Object.keys(yearBranchHall)
-  .sort((a, b) => a - b)
-  .forEach((year) => {
-
-    const branches = yearBranchHall[year];
-
-    // Collect all batches across all branches for this year
-    let yearRowCount = 0;
-
-    Object.keys(branches).forEach(branch => {
-      Object.keys(branches[branch]).forEach(hall => {
-        Object.keys(branches[branch][hall]).forEach(batch => {
-          yearRowCount++;
-        });
-      });
-    });
-
-    let yearPrinted = false;
-
-    // Create batchMap → batch grouped across branches
-    const batchMap = {};
-
-    Object.keys(branches).forEach(branch => {
-      Object.keys(branches[branch]).forEach(hall => {
-        Object.keys(branches[branch][hall]).forEach(batch => {
-          if (!batchMap[batch]) batchMap[batch] = [];
-          batchMap[batch].push({
-            hall,
-            rolls: branches[branch][hall][batch]
+      // Create batchMap → batch grouped across branches
+      const batchMap = {};
+      Object.keys(branches).forEach(branch => {
+        Object.keys(branches[branch]).forEach(hall => {
+          Object.keys(branches[branch][hall]).forEach(batch => {
+            if (!batchMap[batch]) batchMap[batch] = [];
+            batchMap[batch].push({
+              hall,
+              rolls: branches[branch][hall][batch]
+            });
           });
         });
       });
-    });
 
-    Object.keys(batchMap).sort().forEach((batch) => {
+      Object.keys(batchMap).sort().forEach((batch) => {
+        const batchRows = batchMap[batch];
+        const batchRowCount = batchRows.length;
+        let batchPrinted = false;
 
-      const batchRows = batchMap[batch];
-      const batchRowCount = batchRows.length;
+        batchRows.forEach(({ hall, rolls }) => {
+          html += `<tr>`;
+          // Batch rowspan
+          if (!batchPrinted) {
+            html += `<td rowspan="${batchRowCount}" style="text-align:center; font-weight:bold;">${batch}</td>`;
+            batchPrinted = true;
+          }
 
-      let batchPrinted = false;
-
-      batchRows.forEach(({ hall, rolls }) => {
-
-        html += `<tr>`;
-
-        // Year rowspan
-        if (!yearPrinted) {
-          html += `<td rowspan="${yearRowCount}">${year}</td>`;
-          yearPrinted = true;
-        }
-
-        // Batch rowspan
-        if (!batchPrinted) {
-          html += `<td rowspan="${batchRowCount}">${batch}</td>`;
-          batchPrinted = true;
-        }
-
-        html += `
-            <td>${rolls.sort().join(", ")}</td>
-            <td>${hall}</td>
+          html += `
+            <td style="text-align:left; font-size: 12px; padding: 8px; font-weight:bold; color: #000;">${rolls.sort().join(", ")}</td>
+            <td style="text-align:center; font-weight:bold; font-size: 14px; color: #000;">${hall}</td>
         </tr>`;
+        });
       });
 
+      html += `</tbody></table>`;
     });
 
-  });
 
-html += `
-</table>
-`;
+  /* =====================================================
+     🏫 HALL WISE YEAR SUMMARY (Split by Year)
+  ===================================================== */
 
-/* =====================================================
-   🏫 HALL WISE YEAR SUMMARY
-===================================================== */
+  // dataByYear[year] = [ { hallName, rolls, breakdownStr, count } ]
+  const dataByYear = {};
 
-html += `
+  for (const [hallName, rows] of Object.entries(allocation)) {
+    const tempMap = {}; // year -> { rolls: [], breakdown: { batch: { subject: count } } }
+
+    rows.forEach(row =>
+      row.forEach(bench =>
+        bench.forEach(s => {
+          if (!s) return;
+          const year = s.year || "UNKNOWN";
+          const batch = s.Batch || "UNKNOWN";
+          const subject = s.subject || "UNKNOWN";
+
+          tempMap[year] ??= { rolls: [], breakdown: {} };
+          tempMap[year].rolls.push(s.RollNumber);
+          tempMap[year].breakdown[batch] ??= {};
+          tempMap[year].breakdown[batch][subject] = (tempMap[year].breakdown[batch][subject] || 0) + 1;
+        })
+      )
+    );
+
+    for (const [year, yData] of Object.entries(tempMap)) {
+      const rolls = yData.rolls.sort();
+      const breakdown = yData.breakdown;
+
+      let breakdownStr = Object.entries(breakdown).map(([batch, subjects]) => {
+        let subjStr = Object.entries(subjects).map(([subj, count]) => `${subj}: ${count}`).join(", ");
+        return `<b>Batch ${batch}</b>: ${subjStr}`;
+      }).join("<br>");
+
+      dataByYear[year] ??= [];
+      dataByYear[year].push({
+        hallName,
+        rolls: rolls.join(", "),
+        breakdownStr,
+        count: rolls.length
+      });
+    }
+  }
+
+  // Generate Year-wise HTML sections
+  Object.keys(dataByYear).sort().forEach(year => {
+    html += `
 <div class="page-break"></div>
 
-<h3>Hall Wise Year Summary</h3>
+<div style="border: 2px solid #000; padding: 10px; margin-bottom: 20px; background: #f9f9f9;">
+  <h1 style="margin:0; font-size: 20px;">College of Engineering Chengannur</h1>
+  <h2 style="margin:5px 0; font-size: 18px;">Hall Wise Summary - YEAR ${year}</h2>
+  <div style="display: flex; justify-content: space-between; font-weight: bold; margin-top: 10px; border-top: 1px solid #ccc; padding-top: 5px;">
+    <span>Date: ${datePart}</span>
+    <span>Session: ${sessionLabel}</span>
+  </div>
+</div>
 
-<table>
-<tr>
-  <th>Hall</th>
-  <th>Year</th>
-  <th>Roll Numbers</th>
-  <th>Total Students</th>
-  <th>Total Absentees</th>
+<table style="width: 100%; border-collapse: collapse; table-layout: fixed;">
+<thead>
+<tr style="background: #333; color: #fff;">
+  <th style="width: 15%; border: 1px solid #000; padding: 8px; color: #000;">Hall</th>
+  <th style="width: 45%; border: 1px solid #000; padding: 8px; color: #000;">Roll Numbers</th>
+  <th style="width: 30%; border: 1px solid #000; padding: 8px; color: #000;">Subjects</th>
+  <th style="width: 10%; border: 1px solid #000; padding: 8px; color: #000;">Total</th>
 </tr>
+</thead>
+<tbody>
 `;
 
-for (const [hallName, rows] of Object.entries(allocation)) {
-
-  const yearMap = {};
-
-  rows.forEach(row =>
-    row.forEach(bench =>
-      bench.forEach(s => {
-        if (!s) return;
-
-        const year = s.year || "UNKNOWN";
-
-        yearMap[year] ??= [];
-        yearMap[year].push(s.RollNumber);
-      })
-    )
-  );
-
-  Object.keys(yearMap)
-    .sort((a,b) => a - b)
-    .forEach((year) => {
-
-      const rolls = yearMap[year].sort();
-
+    dataByYear[year].forEach(h => {
       html += `
 <tr>
-  <td><b>${hallName}</b></td>
-  <td><b>${year}</b></td>
-  <td style="text-align:left;">${rolls.join(", ")}</td>
-  <td><b>${rolls.length}</b></td>
-  <td></td>
+  <td style="border: 1px solid #000; padding: 10px; text-align: center; font-size: 16px; color: #000;"><b>${h.hallName}</b></td>
+  <td style="border: 1px solid #000; padding: 10px; text-align: left; font-size: 13px; color: #000;">${h.rolls}</td>
+  <td style="border: 1px solid #000; padding: 10px; text-align: left; font-size: 12px; color: #000;">${h.breakdownStr}</td>
+  <td style="border: 1px solid #000; padding: 10px; text-align: center; font-size: 16px; color: #000;"><b>${h.count}</b></td>
 </tr>
 `;
     });
-}
 
-html += `</table>`;
+    html += `</tbody></table>`;
+  });
 
   return html;
 }
