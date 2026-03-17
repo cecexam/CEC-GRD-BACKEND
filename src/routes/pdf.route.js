@@ -510,7 +510,7 @@ function generateSummaryHTML(allocation, date) {
     <h2>College of Engineering Chengannur</h2>
     <h5>(Managed by IHRD, A Govt of Kerala Undertaking)</h5>
     <h3>
-      First Internal Examination – 
+      Second Internal Examination – 
       ${new Date(date)
         .toLocaleString("default", { month: "long", year: "numeric" })
         .toUpperCase()}
