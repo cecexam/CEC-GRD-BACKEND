@@ -69,27 +69,23 @@ function splitIntoRanges(rolls) {
   let start = rolls[0];
   let prev = rolls[0];
 
-  function getPrefix(roll) {
-    return roll.match(/^[A-Za-z]+/)?.[0] || "";
-  }
-
-  function getNumber(roll) {
-    return parseInt(roll.match(/\d+$/)?.[0] || 0);
-  }
+  const getParts = (roll) => {
+    const match = roll.match(/^(.*?)(\d+)$/);
+    return match ? { prefix: match[1], num: parseInt(match[2], 10) } : { prefix: roll, num: 0 };
+  };
 
   for (let i = 1; i < rolls.length; i++) {
     const current = rolls[i];
+    const pPrev = getParts(prev);
+    const pCurr = getParts(current);
 
-    const samePrefix = getPrefix(current) === getPrefix(prev);
-    const consecutive = getNumber(current) === getNumber(prev) + 1;
-
-    if (samePrefix && consecutive) {
+    if (pCurr.prefix === pPrev.prefix && pCurr.num === pPrev.num + 1) {
       prev = current;
     } else {
       ranges.push({
         from: start,
         to: prev,
-        count: getNumber(prev) - getNumber(start) + 1,
+        count: getParts(prev).num - getParts(start).num + 1,
       });
 
       start = current;
@@ -101,7 +97,7 @@ function splitIntoRanges(rolls) {
   ranges.push({
     from: start,
     to: prev,
-    count: getNumber(prev) - getNumber(start) + 1,
+    count: getParts(prev).num - getParts(start).num + 1,
   });
 
   return ranges;
@@ -109,7 +105,7 @@ function splitIntoRanges(rolls) {
 /* =========================================================
    📄 GENERATE HALL HTML
 ========================================================= */
-function generateHallHTML(allocation, date) {
+function generateHallHTML(allocation, date, semType, yearSem) {
   const hallHTMLs = {};
 
   for (const [hallName, rows] of Object.entries(allocation)) {
@@ -316,7 +312,7 @@ th {
 `;
     for (const year of Object.keys(yearMap).sort((a, b) => a - b)) {
       html += `
-<h3>Year: ${year}</h3>
+<h3>Semester: ${findSem(year, semType)}</h3>
 
 <table>
 <tr>
@@ -405,59 +401,28 @@ th {
    📊 GENERATE SUMMARY HTML
 ========================================================= */
 
-function compressRollNumbers(rolls) {
-  if (!rolls || rolls.length === 0) return "";
-
-  // Sort properly (numeric aware)
-  rolls.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-
-  const ranges = [];
-  let start = rolls[0];
-  let prev = rolls[0];
-
-  function getPrefix(roll) {
-    return roll.match(/^[A-Za-z]+/)?.[0] || "";
-  }
-
-  function getNumber(roll) {
-    return parseInt(roll.match(/\d+$/)?.[0] || 0);
-  }
-
-  for (let i = 1; i < rolls.length; i++) {
-    const current = rolls[i];
-
-    const samePrefix = getPrefix(current) === getPrefix(prev);
-    const consecutive = getNumber(current) === getNumber(prev) + 1;
-
-    if (samePrefix && consecutive) {
-      prev = current;
-    } else {
-      if (start === prev) {
-        ranges.push(start);
-      } else {
-        ranges.push(`${start} - ${prev}`);
-      }
-      start = current;
-      prev = current;
-    }
-  }
-
-  // Push last range
-  if (start === prev) {
-    ranges.push(start);
-  } else {
-    ranges.push(`${start} - ${prev}`);
-  }
-
-  return ranges.join(", ");
-}
 
 function getBranchFromRoll(roll) {
   const match = roll.match(/^([A-Z]+)/);
   return match ? match[1] : "Other";
 }
 
-function generateSummaryHTML(allocation, date) {
+function findSem(year, semType) {
+  const y = String(year);
+  if (y.includes("1")) {
+    return semType == "Even" ? "S2" : "S1"
+  } else if (y.includes("2")) {
+    return semType == "Even" ? "S4" : "S3"
+  } else if (y.includes("3")) {
+    return semType == "Even" ? "S6" : "S5"
+  } else if (y.includes("4")) {
+    return semType == "Even" ? "S8" : "S7"
+  } else {
+    return semType == "Even" ? "S8" : "S7"
+  }
+}
+
+function generateSummaryHTML(allocation, date, semType, year, seriesName) {
   let html = `
   <style>
     body { 
@@ -510,17 +475,18 @@ function generateSummaryHTML(allocation, date) {
     <h2>College of Engineering Chengannur</h2>
     <h5>(Managed by IHRD, A Govt of Kerala Undertaking)</h5>
     <h3>
-      Second Internal Examination – 
+      ${seriesName} 
       ${new Date(date)
-        .toLocaleString("default", { month: "long", year: "numeric" })
-        .toUpperCase()}
+      .toLocaleString("default", { month: "long", year: "numeric" })
+      .toUpperCase()}
     </h3>
 
     <div style="display:flex; justify-content:center; align-items:center; margin-top:10px; font-weight:bold; gap:10px;">
-      <span style="text-align:center; font-size:20px; font-weight:bold;">S2</span>
+      <span style="text-align:center; font-size:20px; font-weight:bold;">${findSem(year, semType)
+    }</span>
       <span style="text-align:center; font-size:16px;">${formatWithHalfDay(
-        date,
-      )}</span>
+      date,
+    )}</span>
     </div>
   </div>
 
@@ -573,10 +539,17 @@ function generateSummaryHTML(allocation, date) {
       branchSegments[branch].push({ range, hall });
     };
 
+    const getParts = (roll) => {
+      const match = roll.match(/^(.*?)(\d+)$/);
+      return match ? { prefix: match[1], num: parseInt(match[2], 10) } : { prefix: roll, num: 0 };
+    };
+
     for (let i = 1; i < allStudents.length; i++) {
       const s = allStudents[i];
+      const pPrev = getParts(endRoll);
+      const pCurr = getParts(s.roll);
 
-      if (s.branch === currentBranch && s.hall === currentHall) {
+      if (s.branch === currentBranch && s.hall === currentHall && pCurr.prefix === pPrev.prefix && pCurr.num === pPrev.num + 1) {
         endRoll = s.roll;
       } else {
         pushSegment(currentBranch, startRoll, endRoll, currentHall);
@@ -638,9 +611,14 @@ function generateSummaryHTML(allocation, date) {
     th { background:#eee; }
   </style>
   <div class="page-break"></div>
-  <h1>College of Engineering Chengannur</h1>
-  <h1 style="text-align:center">Hall Allocation Summary</h1>
-  <h6>Date: ${formatWithHalfDay(date)}</h6>
+  <div class="main-header">
+    <h2>College of Engineering Chengannur</h2>
+    <h5>(Managed by IHRD, A Govt of Kerala Undertaking)</h5>
+    <h3>Hall Allocation Summary</h3>
+    <div style="font-weight:bold; margin-top:5px;">
+      Date: ${formatWithHalfDay(date)}
+    </div>
+  </div>
   `;
 
   for (const [hall, rows] of Object.entries(allocation)) {
@@ -698,51 +676,6 @@ function generateSummaryHTML(allocation, date) {
 /* =========================================================
    📊 GENERATE SUMMARY HTML
 ========================================================= */
-function getRanges(rolls) {
-  if (!rolls || rolls.length === 0) return "";
-
-  // Natural sort
-  const sorted = [...rolls].sort((a, b) =>
-    a.localeCompare(b, undefined, { numeric: true }),
-  );
-
-  const ranges = [];
-  let start = sorted[0];
-  let prev = sorted[0];
-
-  const getNum = (s) => {
-    const match = s.match(/(\d+)$/);
-    return match ? parseInt(match[1], 10) : null;
-  };
-
-  const getPrefix = (s) => {
-    const match = s.match(/^(.*?)(\d+)$/);
-    return match ? match[1] : s;
-  };
-
-  for (let i = 1; i < sorted.length; i++) {
-    const curr = sorted[i];
-    const prevNum = getNum(prev);
-    const currNum = getNum(curr);
-    const prevPrefix = getPrefix(prev);
-    const currPrefix = getPrefix(curr);
-
-    if (
-      prevNum !== null &&
-      currNum !== null &&
-      prevPrefix === currPrefix &&
-      currNum === prevNum + 1
-    ) {
-      prev = curr;
-    } else {
-      ranges.push(start === prev ? start : `${start}-${prev}`);
-      start = curr;
-      prev = curr;
-    }
-  }
-  ranges.push(start === prev ? start : `${start}-${prev}`);
-  return ranges.join(", ");
-}
 
 /* =========================================================
    🚀 ROUTE: CACHE → GENERATE → STORE → RETURN
@@ -786,8 +719,8 @@ router.post("/", async (req, res) => {
 
     const allocation = reconstructAllocation(data.halls);
 
-    const roomHTMLs = generateHallHTML(allocation, data.examDate);
-    const summaryHTML = generateSummaryHTML(allocation, data.examDate);
+    const roomHTMLs = generateHallHTML(allocation, data.examDate, data.semType, data.sems);
+    const summaryHTML = generateSummaryHTML(allocation, data.examDate, data.semType, data.sems, data.seriesName);
 
     /* =====================================
        💾 SAVE TO FIRESTORE

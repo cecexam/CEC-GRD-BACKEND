@@ -511,6 +511,7 @@ router.post(
             admin.firestore.FieldValue.serverTimestamp(),
 
           name,
+          seriesName: req.body.seriesName || "",
           sems,
           isElective: false,
           examDate,

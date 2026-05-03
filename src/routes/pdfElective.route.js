@@ -65,7 +65,22 @@ function formatWithHalfDay(dateTimeStr) {
 /* =====================================================
    📄 GENERATE HALL + ATTENDANCE HTML
 ===================================================== */
-function generateHallHTML(allocation, date) {
+function findSem(year, semType) {
+  const y = String(year);
+  if (y.includes("1")) {
+    return semType == "Even" ? "S2" : "S1"
+  } else if (y.includes("2")) {
+    return semType == "Even" ? "S4" : "S3"
+  } else if (y.includes("3")) {
+    return semType == "Even" ? "S6" : "S5"
+  } else if (y.includes("4")) {
+    return semType == "Even" ? "S8" : "S7"
+  } else {
+    return semType == "Even" ? "S8" : "S7"
+  }
+}
+
+function generateHallHTML(allocation, date, semType) {
   const hallHTMLs = {};
 
   for (const [hallName, rows] of Object.entries(allocation)) {
@@ -272,7 +287,7 @@ th {
 `;
     for (const year of Object.keys(yearMap).sort((a, b) => a - b)) {
       html += `
-<h3>Year: ${year}</h3>
+<h3>Semester: ${findSem(year, semType)}</h3>
 
 <table>
 <tr>
@@ -358,7 +373,7 @@ th {
 /* =====================================================
    📊 GENERATE ROLL SUMMARY HTML
 ===================================================== */
-function generateSummaryHTML(allocation, date) {
+function generateSummaryHTML(allocation, date, semType, seriesName) {
   const [datePart, timePart] = date ? date.split("T") : ["", ""];
   const hour = timePart ? parseInt(timePart.split(":")[0], 10) : 0;
   const sessionLabel = hour < 12 ? "FN" : "AN";
@@ -470,7 +485,8 @@ function generateSummaryHTML(allocation, date) {
 
 <div style="border: 2px solid #000; padding: 10px; margin-bottom: 20px; background: #f9f9f9;">
   <h1 style="margin:0; font-size: 20px;">College of Engineering Chengannur</h1>
-  <h2 style="margin:5px 0; font-size: 18px;">Roll Number Wise Allocation - YEAR ${year}</h2>
+  <h2 style="margin:5px 0; font-size: 18px;">${seriesName || "Hall Allocation Summary"}</h2>
+  <h2 style="margin:5px 0; font-size: 18px;">Roll Number Wise Allocation - ${findSem(year, semType)}</h2>
   <div style="display: flex; justify-content: space-between; font-weight: bold; margin-top: 10px; border-top: 1px solid #ccc; padding-top: 5px;">
     <span>Date: ${datePart}</span>
     <span>Session: ${sessionLabel}</span>
@@ -578,7 +594,8 @@ function generateSummaryHTML(allocation, date) {
 
 <div style="border: 2px solid #000; padding: 10px; margin-bottom: 20px; background: #f9f9f9;">
   <h1 style="margin:0; font-size: 20px;">College of Engineering Chengannur</h1>
-  <h2 style="margin:5px 0; font-size: 18px;">Hall Wise Summary - YEAR ${year}</h2>
+  <h2 style="margin:5px 0; font-size: 18px;">${seriesName || "Hall Allocation Summary"}</h2>
+  <h2 style="margin:5px 0; font-size: 18px;">Hall Wise Summary - ${findSem(year, semType)}</h2>
   <div style="display: flex; justify-content: space-between; font-weight: bold; margin-top: 10px; border-top: 1px solid #ccc; padding-top: 5px;">
     <span>Date: ${datePart}</span>
     <span>Session: ${sessionLabel}</span>
@@ -658,8 +675,8 @@ router.post("/", async (req, res) => {
 
     const allocation = reconstructAllocation(data.halls);
 
-    const hallHTML = generateHallHTML(allocation, data.examDate);
-    const summaryHTML = generateSummaryHTML(allocation, data.examDate);
+    const hallHTML = generateHallHTML(allocation, data.examDate, data.semType);
+    const summaryHTML = generateSummaryHTML(allocation, data.examDate, data.semType, data.seriesName);
 
     /* =====================================
        💾 SAVE

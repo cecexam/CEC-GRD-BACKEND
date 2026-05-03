@@ -369,7 +369,7 @@ router.post(
        const doc = await db.collection("examAllocations").add({
          name: req.body.examName,
          sems: req.body.years,
-         isElective: req.body.type !== "Normal",
+         isElective: true,
          createdAt: admin.firestore.FieldValue.serverTimestamp(),
          meta: {
            totalStudents: students.length,
