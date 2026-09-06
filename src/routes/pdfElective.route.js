@@ -3,10 +3,9 @@ const express = require("express");
 const router = express.Router();
 
 const { admin, db } = require("../config/firebase");
+const { badRequest, notFound, serverError } = require("../utils/apiResponse");
 
-/* =====================================================
-   🔁 RECONSTRUCT allocation MATRIX FROM FIRESTORE
-===================================================== */
+
 function reconstructAllocation(hallsData) {
   const allocation = {};
 
@@ -44,7 +43,13 @@ function reconstructAllocation(hallsData) {
       });
     }
 
-    matrix.hallType = hallData.type || "Bench"; // Attach type metadata
+    const hasAllocatedStudents = matrix.some((row) =>
+      row.some((bench) => Array.isArray(bench) && bench.length > 0),
+    );
+
+    if (!hasAllocatedStudents) continue;
+
+    matrix.hallType = hallData.type || "Bench"; 
     allocation[hallName] = matrix;
   }
 
@@ -59,12 +64,7 @@ function formatWithHalfDay(dateTimeStr) {
   const period = hour < 12 ? "Forenoon" : "Afternoon";
   return `${date} ${period}`;
 }
-/* =====================================================
-   📄 GENERATE HALL + ATTENDANCE HTML
-===================================================== */
-/* =====================================================
-   📄 GENERATE HALL + ATTENDANCE HTML
-===================================================== */
+
 function findSem(year, semType) {
   const y = String(year);
   if (y.includes("1")) {
@@ -80,6 +80,27 @@ function findSem(year, semType) {
   }
 }
 
+function parseSelectedYears(yearInput) {
+  if (Array.isArray(yearInput)) return yearInput;
+
+  if (typeof yearInput === "string") {
+    try {
+      const parsed = JSON.parse(yearInput);
+      return Array.isArray(parsed) ? parsed : [yearInput];
+    } catch {
+      return [yearInput];
+    }
+  }
+
+  return yearInput ? [yearInput] : [];
+}
+
+function resolveYearDisplay(storedYear, selectedYears) {
+  if (storedYear === "A") return selectedYears[0] ?? "A";
+  if (storedYear === "B") return selectedYears[1] ?? "B";
+  return storedYear;
+}
+
 function generateHallHTML(allocation, date, semType) {
   const hallHTMLs = {};
 
@@ -88,7 +109,6 @@ function generateHallHTML(allocation, date, semType) {
 
     const hallType = rows.hallType || "Bench";
 
-    /* Collect Students */
     rows.forEach((row, rIdx) =>
       row.forEach((bench, bIdx) =>
         bench.forEach((s) => {
@@ -105,7 +125,6 @@ function generateHallHTML(allocation, date, semType) {
       ),
     );
 
-    /* Group by Year */
     const yearMap = {};
 
     students.forEach((s) => {
@@ -116,8 +135,6 @@ function generateHallHTML(allocation, date, semType) {
     Object.values(yearMap).forEach((arr) =>
       arr.sort((a, b) => a.name.localeCompare(b.name)),
     );
-
-    /* Base HTML */
 
     let html = `
 <!DOCTYPE html>
@@ -233,7 +250,7 @@ th {
 <body>
 `;
 
-    /* ================= SEATING LIST ================= */
+ 
 
     /* ================= GRID ================= */
 
@@ -298,14 +315,14 @@ th {
 </tr>
 `;
 
-      // 🔥 Strict Roll Number Sorting
+  
       const sortedStudents = [...yearMap[year]].sort((a, b) => {
         const regex = /^([A-Z]+\d+)([A-Z])(\d+)$/;
 
         const matchA = a.roll.match(regex);
         const matchB = b.roll.match(regex);
 
-        // Fallback if pattern doesn't match
+  
         if (!matchA || !matchB) {
           return a.roll.localeCompare(b.roll, undefined, { numeric: true });
         }
@@ -313,17 +330,17 @@ th {
         const [, prefixA, batchA, numA] = matchA;
         const [, prefixB, batchB, numB] = matchB;
 
-        // 1️⃣ Compare prefix (EC24 etc)
+    
         if (prefixA !== prefixB) {
           return prefixA.localeCompare(prefixB);
         }
 
-        // 2️⃣ Compare batch letter (A before B)
+    
         if (batchA !== batchB) {
           return batchA.localeCompare(batchB);
         }
 
-        // 3️⃣ Compare numeric part
+      
         return Number(numA) - Number(numB);
       });
 
@@ -373,7 +390,12 @@ th {
 /* =====================================================
    📊 GENERATE ROLL SUMMARY HTML
 ===================================================== */
-function generateSummaryHTML(allocation, date, semType, seriesName) {
+function generateSummaryHTML(allocation, date, semType, seriesName, selectedYearInput) {
+  const selectedYears = parseSelectedYears(selectedYearInput);
+  console.log(semType);
+  console.log(seriesName);
+  
+  
   const [datePart, timePart] = date ? date.split("T") : ["", ""];
   const hour = timePart ? parseInt(timePart.split(":")[0], 10) : 0;
   const sessionLabel = hour < 12 ? "FN" : "AN";
@@ -455,10 +477,7 @@ function generateSummaryHTML(allocation, date, semType, seriesName) {
         for (const s of bench) {
           if (!s) continue;
 
-          let yearNumber = Number(s.year);
-          if (isNaN(yearNumber)) {
-            yearNumber = s.year === "A" ? 4 : 3;
-          }
+          const yearNumber = resolveYearDisplay(s.year, selectedYears);
 
           const branchMatch = s.RollNumber.match(/^[A-Za-z]+/);
           const branch = branchMatch ? branchMatch[0] : "UNKNOWN";
@@ -483,18 +502,23 @@ function generateSummaryHTML(allocation, date, semType, seriesName) {
       html += `
 <div class="page-break"></div>
 
-<div style="border: 2px solid #000; padding: 10px; margin-bottom: 20px; background: #f9f9f9;">
-  <h1 style="margin:0; font-size: 20px;">College of Engineering Chengannur</h1>
-  <h2 style="margin:5px 0; font-size: 18px;">${seriesName || "Hall Allocation Summary"}</h2>
-  <h2 style="margin:5px 0; font-size: 18px;">Roll Number Wise Allocation - ${findSem(year, semType)}</h2>
-  <div style="display: flex; justify-content: space-between; font-weight: bold; margin-top: 10px; border-top: 1px solid #ccc; padding-top: 5px;">
-    <span>Date: ${datePart}</span>
-    <span>Session: ${sessionLabel}</span>
-  </div>
-</div>
-
 <table border="1" cellspacing="0" cellpadding="3" style="width:100%; border-collapse:collapse; table-layout: fixed;">
     <thead>
+    <tr>
+      <th colspan="3" style="border-top: hidden; border-left: hidden; border-right: hidden; border-bottom: none; padding: 0 0 20px 0; text-align: left; font-weight: normal;">
+        <div style="border: 2px solid #000; padding: 10px; background: #f9f9f9;">
+          <h1 style="margin:0; font-size: 20px;">College of Engineering Chengannur</h1>
+          <h5 style="margin:2px 0 6px 0; font-size: 13px; font-weight: normal;">(Managed by IHRD, A Govt of Kerala Undertaking)</h5>
+          <h2 style="margin:5px 0; font-size: 18px;">${seriesName || "Hall Allocation Summary"}</h2>
+          <h2 style="margin:5px 0; font-size: 18px;">Roll Number Wise Allocation - ${findSem(year, semType)}</h2>
+          <div style="display: flex; justify-content: space-between; font-weight: bold; margin-top: 10px; border-top: 1px solid #ccc; padding-top: 5px;">
+            <span>Date: ${datePart}</span>
+            <span style=" font-weight:200;">Generated using CEC-GRID</span>
+            <span>Session: ${sessionLabel}</span>
+          </div>
+        </div>
+      </th>
+    </tr>
     <tr style="background: #333; color: #fff;">
         <th style="width: 10%; border: 1px solid #000; padding: 8px; color: #000;">Batch</th>
         <th style="width: 75%; border: 1px solid #000; padding: 8px; color: #000;">Roll Numbers</th>
@@ -525,7 +549,7 @@ function generateSummaryHTML(allocation, date, semType, seriesName) {
 
         batchRows.forEach(({ hall, rolls }) => {
           html += `<tr>`;
-          // Batch rowspan
+           
           if (!batchPrinted) {
             html += `<td rowspan="${batchRowCount}" style="text-align:center; font-weight:bold;">${batch}</td>`;
             batchPrinted = true;
@@ -589,13 +613,18 @@ function generateSummaryHTML(allocation, date, semType, seriesName) {
 
   // Generate Year-wise HTML sections
   Object.keys(dataByYear).sort().forEach(year => {
+    const displayYear = resolveYearDisplay(year, selectedYears);
+    const semLabel = String(displayYear).match(/^\d+$/)
+      ? findSem(displayYear, semType)
+      : `Year ${displayYear}`;
+
     html += `
 <div class="page-break"></div>
 
 <div style="border: 2px solid #000; padding: 10px; margin-bottom: 20px; background: #f9f9f9;">
   <h1 style="margin:0; font-size: 20px;">College of Engineering Chengannur</h1>
   <h2 style="margin:5px 0; font-size: 18px;">${seriesName || "Hall Allocation Summary"}</h2>
-  <h2 style="margin:5px 0; font-size: 18px;">Hall Wise Summary - ${findSem(year, semType)}</h2>
+  <h2 style="margin:5px 0; font-size: 18px;">Hall Wise Summary - ${semLabel}</h2>
   <div style="display: flex; justify-content: space-between; font-weight: bold; margin-top: 10px; border-top: 1px solid #ccc; padding-top: 5px;">
     <span>Date: ${datePart}</span>
     <span>Session: ${sessionLabel}</span>
@@ -640,7 +669,7 @@ router.post("/", async (req, res) => {
     console.log("sddcvdhbvjn ");
 
     if (!examId) {
-      return res.status(400).json({ error: "examId required" });
+      return badRequest(res, "Exam ID is required to generate the PDF.");
     }
 
     const ref = db.collection("examAllocations").doc(examId);
@@ -648,7 +677,7 @@ router.post("/", async (req, res) => {
     const snap = await ref.get();
 
     if (!snap.exists) {
-      return res.status(404).json({ error: "Allocation not found" });
+      return notFound(res, "Exam allocation was not found.");
     }
 
     const data = snap.data();
@@ -676,8 +705,10 @@ router.post("/", async (req, res) => {
     const allocation = reconstructAllocation(data.halls);
 
     const hallHTML = generateHallHTML(allocation, data.examDate, data.semType);
-    const summaryHTML = generateSummaryHTML(allocation, data.examDate, data.semType, data.seriesName);
+    const summaryHTML = generateSummaryHTML(allocation, data.examDate, data.semType, data.seriesName, data.sems);
 
+    console.log(data.semType);
+    
     /* =====================================
        💾 SAVE
     ===================================== */
@@ -700,8 +731,7 @@ router.post("/", async (req, res) => {
     });
   } catch (err) {
     console.error("ERROR:", err);
-
-    res.status(500).json({ error: err.message });
+    return serverError(res, err, "Failed to generate elective seating PDF.");
   }
 });
 
