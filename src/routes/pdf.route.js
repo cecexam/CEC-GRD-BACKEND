@@ -3,10 +3,9 @@ const express = require("express");
 const router = express.Router();
 
 const { admin, db } = require("../config/firebase");
+const { badRequest, notFound, serverError } = require("../utils/apiResponse");
 
-/* =========================================================
-   🔁 RECONSTRUCT allocation MATRIX from Firestore
-========================================================= */
+
 function reconstructAllocation(hallsData) {
   const allocation = {};
 
@@ -43,6 +42,12 @@ function reconstructAllocation(hallsData) {
         }
       });
     }
+
+    const hasAllocatedStudents = matrix.some((row) =>
+      row.some((bench) => Array.isArray(bench) && bench.length > 0),
+    );
+
+    if (!hasAllocatedStudents) continue;
 
     allocation[hallName] = matrix;
   }
@@ -102,9 +107,7 @@ function splitIntoRanges(rolls) {
 
   return ranges;
 }
-/* =========================================================
-   📄 GENERATE HALL HTML
-========================================================= */
+
 function generateHallHTML(allocation, date, semType, yearSem) {
   const hallHTMLs = {};
 
@@ -182,7 +185,7 @@ th {
 
  
 
-/* ================= PRINT ================= */
+
 
 @media print {
 
@@ -198,7 +201,7 @@ th {
 
 }
 
-/* ================= GRID (BIG SIZE) ================= */
+
 
 .grid-container {
   margin-top: 20px;
@@ -258,7 +261,7 @@ th {
 <body>
 `;
 
-    /* ================= SEATING LIST ================= */
+
 
     /* ================= GRID ================= */
 
@@ -303,7 +306,6 @@ th {
 </div>
 `;
 
-    /* ================= ATTENDANCE ================= */
     html += `
 <div class="page-break"></div>
 
@@ -394,12 +396,7 @@ th {
   return hallHTMLs;
 }
 
-/* =========================================================
-   📊 GENERATE SUMMARY HTML
-========================================================= */
-/* =========================================================
-   📊 GENERATE SUMMARY HTML
-========================================================= */
+
 
 
 function getBranchFromRoll(roll) {
@@ -408,6 +405,10 @@ function getBranchFromRoll(roll) {
 }
 
 function findSem(year, semType) {
+  console.log(year);
+  console.log(semType);
+  
+  
   const y = String(year);
   if (y.includes("1")) {
     return semType == "Even" ? "S2" : "S1"
@@ -422,7 +423,32 @@ function findSem(year, semType) {
   }
 }
 
+function parseSelectedYears(yearInput) {
+  if (Array.isArray(yearInput)) return yearInput;
+
+  if (typeof yearInput === "string") {
+    try {
+      const parsed = JSON.parse(yearInput);
+      return Array.isArray(parsed) ? parsed : [yearInput];
+    } catch {
+      return [yearInput];
+    }
+  }
+
+  return yearInput ? [yearInput] : [];
+}
+
+function resolveYearDisplay(storedYear, selectedYears) {
+  if (storedYear === "A") return selectedYears[0] ?? "A";
+  if (storedYear === "B") return selectedYears[1] ?? "B";
+  return storedYear;
+}
+
 function generateSummaryHTML(allocation, date, semType, year, seriesName) {
+  const selectedYears = parseSelectedYears(year);
+  const [datePart, timePart] = date ? date.split("T") : ["", ""];
+  const hour = timePart ? parseInt(timePart.split(":")[0], 10) : 0;
+  const sessionLabel = hour < 12 ? "FN" : "AN";
   let html = `
   <style>
     body { 
@@ -471,39 +497,23 @@ function generateSummaryHTML(allocation, date, semType, year, seriesName) {
 }
   </style>
   
-  <div class="main-header">
-    <h2>College of Engineering Chengannur</h2>
-    <h5>(Managed by IHRD, A Govt of Kerala Undertaking)</h5>
-    <h3>
-      ${seriesName} 
-      ${new Date(date)
-      .toLocaleString("default", { month: "long", year: "numeric" })
-      .toUpperCase()}
-    </h3>
-
-    <div style="display:flex; justify-content:center; align-items:center; margin-top:10px; font-weight:bold; gap:10px;">
-      <span style="text-align:center; font-size:20px; font-weight:bold;">${findSem(year, semType)
-    }</span>
-      <span style="text-align:center; font-size:16px;">${formatWithHalfDay(
-      date,
-    )}</span>
-    </div>
-  </div>
-
-  <table class="summary-table">
   `;
 
+    
   // ==========================
   // 1️⃣ Flatten Data
   // ==========================
-  const allStudents = [];
+  const allStudentsByYear = {};
 
   Object.entries(allocation).forEach(([hallName, rows]) => {
     rows.forEach((row) => {
       row.forEach((bench) => {
         bench.forEach((s) => {
           if (!s) return;
-          allStudents.push({
+          const storedYear = s.year || "UNKNOWN";
+
+          allStudentsByYear[storedYear] ??= [];
+          allStudentsByYear[storedYear].push({
             roll: s.RollNumber,
             hall: hallName,
             branch: getBranchFromRoll(s.RollNumber),
@@ -513,25 +523,27 @@ function generateSummaryHTML(allocation, date, semType, year, seriesName) {
     });
   });
 
-  // ==========================
-  // 2️⃣ Sort by Branch → Roll
-  // ==========================
-  allStudents.sort((a, b) => {
-    if (a.branch !== b.branch) return a.branch.localeCompare(b.branch);
+  const buildBranchSegments = (students) => {
+    const branchSegments = {};
 
-    return a.roll.localeCompare(b.roll, undefined, { numeric: true });
-  });
+    // ==========================
+    // 2️⃣ Sort by Branch → Roll
+    // ==========================
+    students.sort((a, b) => {
+      if (a.branch !== b.branch) return a.branch.localeCompare(b.branch);
 
-  // ==========================
-  // 3️⃣ Group by Branch → Hall Ranges
-  // ==========================
-  const branchSegments = {};
+      return a.roll.localeCompare(b.roll, undefined, { numeric: true });
+    });
 
-  if (allStudents.length > 0) {
-    let currentBranch = allStudents[0].branch;
-    let currentHall = allStudents[0].hall;
-    let startRoll = allStudents[0].roll;
-    let endRoll = allStudents[0].roll;
+    // ==========================
+    // 3️⃣ Group by Branch → Hall Ranges
+    // ==========================
+    if (students.length === 0) return branchSegments;
+
+    let currentBranch = students[0].branch;
+    let currentHall = students[0].hall;
+    let startRoll = students[0].roll;
+    let endRoll = students[0].roll;
 
     const pushSegment = (branch, start, end, hall) => {
       if (!branchSegments[branch]) branchSegments[branch] = [];
@@ -544,8 +556,8 @@ function generateSummaryHTML(allocation, date, semType, year, seriesName) {
       return match ? { prefix: match[1], num: parseInt(match[2], 10) } : { prefix: roll, num: 0 };
     };
 
-    for (let i = 1; i < allStudents.length; i++) {
-      const s = allStudents[i];
+    for (let i = 1; i < students.length; i++) {
+      const s = students[i];
       const pPrev = getParts(endRoll);
       const pCurr = getParts(s.roll);
 
@@ -561,15 +573,48 @@ function generateSummaryHTML(allocation, date, semType, year, seriesName) {
     }
 
     pushSegment(currentBranch, startRoll, endRoll, currentHall);
-  }
+    return branchSegments;
+  };
 
   // ==========================
-  // 4️⃣ Render Table
+  // 4️⃣ Render Year-wise Tables
   // ==========================
-  Object.keys(branchSegments)
+  Object.keys(allStudentsByYear)
     .sort()
-    .forEach((branch) => {
+    .forEach((storedYear, index) => {
+      const displayYear = resolveYearDisplay(storedYear, selectedYears);
+      const semLabel = String(displayYear).match(/^\d+$/)
+        ? findSem(displayYear, semType)
+        : `Year ${displayYear}`;
+      const branchSegments = buildBranchSegments(allStudentsByYear[storedYear]);
+
       html += `
+  ${index > 0 ? '<div class="page-break"></div>' : ''}
+  <table class="summary-table">
+    <thead>
+      <tr>
+        <th colspan="4" style="border-top: hidden; border-left: hidden; border-right: hidden; border-bottom: none; padding: 0 0 20px 0; text-align: left; font-weight: normal;">
+          <div style="border: 2px solid #000; padding: 10px; background: #f9f9f9;">
+            <h1 style="margin:0; font-size: 20px;">College of Engineering Chengannur</h1>
+            <h5 style="margin:2px 0 6px 0; font-size: 13px; font-weight: normal;">(Managed by IHRD, A Govt of Kerala Undertaking)</h5>
+            <h2 style="margin:5px 0; font-size: 18px;">${seriesName || "Hall Allocation Summary"}</h2>
+            <h2 style="margin:5px 0; font-size: 18px;">Roll Number Wise Allocation - ${semLabel}</h2>
+            <div style="display: flex; justify-content: space-between; font-weight: bold; margin-top: 10px; border-top: 1px solid #ccc; padding-top: 5px;">
+              <span>Date: ${datePart}</span>
+              <span style=" font-weight:200;">Generated using CEC-GRID</span>
+              <span>Session: ${sessionLabel}</span>
+            </div>
+          </div>
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+  `;
+
+      Object.keys(branchSegments)
+        .sort()
+        .forEach((branch) => {
+          html += `
       <tr>
         <th colspan="4" class="branch-header">${branch}</th>
       </tr>
@@ -581,29 +626,62 @@ function generateSummaryHTML(allocation, date, semType, year, seriesName) {
       </tr>
     `;
 
-      const segments = branchSegments[branch];
+          const segments = branchSegments[branch];
 
-      for (let i = 0; i < segments.length; i += 2) {
-        const seg1 = segments[i];
-        const seg2 = segments[i + 1];
+          for (let i = 0; i < segments.length; i += 2) {
+            const seg1 = segments[i];
+            const seg2 = segments[i + 1];
 
-        html += `<tr>`;
+            html += `<tr>`;
 
-        html += `<td>${seg1.range}</td><td>${seg1.hall}</td>`;
+            html += `<td>${seg1.range}</td><td>${seg1.hall}</td>`;
 
-        if (seg2) {
-          html += `<td>${seg2.range}</td><td>${seg2.hall}</td>`;
-        } else {
-          html += `<td></td><td></td>`;
-        }
+            if (seg2) {
+              html += `<td>${seg2.range}</td><td>${seg2.hall}</td>`;
+            } else {
+              html += `<td></td><td></td>`;
+            }
 
-        html += `</tr>`;
-      }
+            html += `</tr>`;
+          }
+        });
+
+      html += `</tbody></table>`;
     });
 
-  html += `</table>`;
+  const hallSummaryByYear = {};
 
-  html += `
+  for (const [hall, rows] of Object.entries(allocation)) {
+    const map = {};
+
+    rows.forEach((row) =>
+      row.forEach((bench) =>
+        bench.forEach((s) => {
+          if (!s) return;
+
+          const storedYear = s.year || "UNKNOWN";
+
+          map[storedYear] ??= {};
+          map[storedYear][s.Batch ?? "UNKNOWN"] ??= [];
+          map[storedYear][s.Batch ?? "UNKNOWN"].push(s.RollNumber);
+        }),
+      ),
+    );
+
+    Object.entries(map).forEach(([storedYear, batches]) => {
+      hallSummaryByYear[storedYear] ??= [];
+      hallSummaryByYear[storedYear].push({ hall, batches });
+    });
+  }
+
+  Object.keys(hallSummaryByYear).sort().forEach((storedYear) => {
+    const hallEntries = hallSummaryByYear[storedYear];
+    const displayYear = resolveYearDisplay(storedYear, selectedYears);
+    const semLabel = String(displayYear).match(/^\d+$/)
+      ? findSem(displayYear, semType)
+      : `Year ${displayYear}`;
+
+    html += `
   <style>
     body { font-family: Arial; font-size: 14px; }
     table { width:100%; border-collapse: collapse; margin-bottom:25px; }
@@ -614,48 +692,33 @@ function generateSummaryHTML(allocation, date, semType, year, seriesName) {
   <div class="main-header">
     <h2>College of Engineering Chengannur</h2>
     <h5>(Managed by IHRD, A Govt of Kerala Undertaking)</h5>
-    <h3>Hall Allocation Summary</h3>
+    <h3>Hall Allocation Summary - ${semLabel}</h3>
     <div style="font-weight:bold; margin-top:5px;">
       Date: ${formatWithHalfDay(date)}
     </div>
   </div>
   `;
 
-  for (const [hall, rows] of Object.entries(allocation)) {
-    const map = {};
+    for (const { hall, batches } of hallEntries) {
+      html += `<h3>Hall: ${hall}</h3>
 
-    rows.forEach((row) =>
-      row.forEach((bench) =>
-        bench.forEach((s) => {
-          if (!s) return;
+      <table>
+        <tr>
+          <th>Year</th>
+          <th>Batch</th>
+          <th>From</th>
+          <th>To</th>
+          <th>Count</th>
+          <th>Absentees</th>
+        </tr>`;
 
-          map[s.year] ??= {};
-          map[s.year][s.Batch ?? "UNKNOWN"] ??= [];
-          map[s.year][s.Batch ?? "UNKNOWN"].push(s.RollNumber);
-        }),
-      ),
-    );
-
-    html += `<h3>Hall: ${hall}</h3>
-
-    <table>
-      <tr>
-        <th>Year</th>
-        <th>Batch</th>
-        <th>From</th>
-        <th>To</th>
-        <th>Count</th>
-        <th>Absentees</th>
-      </tr>`;
-
-    Object.entries(map).forEach(([year, batches]) => {
       Object.entries(batches).forEach(([batch, rolls]) => {
         const ranges = splitIntoRanges(rolls);
 
         ranges.forEach((range) => {
           html += `
             <tr>
-              <td>${year}</td>
+              <td>${displayYear}</td>
               <td>${batch}</td>
               <td>${range.from}</td>
               <td>${range.to}</td>
@@ -665,10 +728,10 @@ function generateSummaryHTML(allocation, date, semType, year, seriesName) {
           `;
         });
       });
-    });
 
-    html += "</table>";
-  }
+      html += "</table>";
+    }
+  });
 
   return html;
 }
@@ -686,7 +749,7 @@ router.post("/", async (req, res) => {
     console.log(req.body);
 
     if (!examId) {
-      return res.status(400).json({ error: "examId is required" });
+      return badRequest(res, "Exam ID is required to generate the PDF.");
     }
 
     const ref = db.collection("examAllocations").doc(examId);
@@ -694,7 +757,7 @@ router.post("/", async (req, res) => {
     const snap = await ref.get();
 
     if (!snap.exists) {
-      return res.status(404).json({ error: "Exam not found" });
+      return notFound(res, "Exam allocation was not found.");
     }
 
     const data = snap.data();
@@ -742,7 +805,7 @@ router.post("/", async (req, res) => {
     });
   } catch (err) {
     console.error("ERROR:", err);
-    res.status(500).json({ error: err.message });
+    return serverError(res, err, "Failed to generate common seating PDF.");
   }
 });
 
